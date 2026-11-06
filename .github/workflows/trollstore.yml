@@ -14,9 +14,9 @@ permissions:
 
 jobs:
   trollstore:
-    # macos-15 / macos-13 都出现过排队 15 分钟拿不到机器；macos-14 是另一个池子。
-    # 构建输出与宿主 CPU 无关：产物目标仍是 iphoneos arm64。
-    runs-on: macos-14
+    # macos-13 / macos-14 已经下线（macos-14 自 2026-11-02 起停止支持），排队永远拿不到机器。
+    # macos-15 默认 Xcode 16.4 + iOS 18.5 SDK，足够构建目标 iOS 15 的 arm64 产物。
+    runs-on: macos-15
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
