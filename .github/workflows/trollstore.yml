@@ -14,9 +14,9 @@ permissions:
 
 jobs:
   trollstore:
-    # macos-15 的 arm64 运行器最近排队超 15 分钟、拿不到机器；macos-13 是 Intel 池，通常更快。
-    # 构建输出与 CPU 架构无关：产物目标仍是 iphoneos arm64。
-    runs-on: macos-13
+    # macos-15 / macos-13 都出现过排队 15 分钟拿不到机器；macos-14 是另一个池子。
+    # 构建输出与宿主 CPU 无关：产物目标仍是 iphoneos arm64。
+    runs-on: macos-14
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
