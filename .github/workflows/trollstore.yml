@@ -35,6 +35,13 @@ jobs:
           python3 --version
           cmake --version
 
+      - name: Install Rust iOS targets
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup target add aarch64-apple-ios x86_64-apple-ios --toolchain stable
+          rustc --version
+          rustup target list --installed
+
       - name: Fetch pinned embedded toolchain
         run: python3 scripts/fetch_toolchain.py
 
@@ -42,10 +49,14 @@ jobs:
         run: |
           set -o pipefail
           if ! python3 scripts/build.py --sdk-root "$(xcrun --sdk iphoneos --show-sdk-path)" 2>&1 | tee build.log; then
-            echo "::group::build.log (last 80 lines)"
-            tail -80 build.log
-            echo "::endgroup::"
-            grep -nE 'error:|fatal error:|Traceback|AssertionError|SystemExit|No such file|not found|undefined symbol|ld:' build.log | tail -25 | while IFS= read -r line; do echo "::error::$line"; done
+            python3 - <<'PY'
+          lines = open('build.log', errors='replace').read().splitlines()
+          # 打印尾部完整上下文，匿名可见的运行标注里也能看到
+          start = max(0, len(lines) - 90)
+          chunk = "\n".join(lines[start:])
+          esc = chunk.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+          print("::error::" + esc)
+          PY
             exit 1
           fi
           IPA=$(ls build/*-unsigned.ipa)
