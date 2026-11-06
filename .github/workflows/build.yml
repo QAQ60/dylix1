@@ -1,0 +1,45 @@
+name: Build simulator app
+
+# 在 GitHub 的 macOS 运行器上构建 Dylix 的模拟器 App（x86_64）。
+# 只能产出可运行的模拟器包，不能产出可安装到真机的 IPA：那需要你自己的
+# 签名证书与描述文件，本项目不附带任何个人证书或共享签名材料。
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, workbuddy]
+    paths-ignore: ['docs/**', '**/*.md']
+
+jobs:
+  simulator:
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain versions
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphonesimulator --show-sdk-path
+          python3 --version
+          cmake --version
+          rustc --version || true
+
+      - name: Fetch pinned embedded toolchain
+        run: python3 scripts/fetch_toolchain.py
+
+      - name: Build simulator app
+        run: python3 scripts/build.py --simulator
+
+      - name: Package simulator app
+        run: |
+          cd build/simulator
+          ditto -c -k --sequesterRsrc --keepParent TheosMobileCompiler.app Dylix-simulator.zip
+          shasum -a 256 Dylix-simulator.zip > Dylix-simulator.zip.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Dylix-simulator
+          path: |
+            build/simulator/Dylix-simulator.zip
+            build/simulator/Dylix-simulator.zip.sha256
+          if-no-files-found: error
