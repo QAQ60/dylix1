@@ -1,6 +1,6 @@
 name: Release simulator build
 
-# 把模拟器构建的产物发布成 GitHub Release 附件。
+# 把已经构建好的模拟器产物发布成 GitHub Release（只在 ubuntu 上跑，不重新编译）。
 # 只能发布模拟器包；可安装到真机的 IPA 需要你自己的签名证书与描述文件，不在这里发布。
 on:
   workflow_dispatch:
@@ -9,29 +9,55 @@ on:
         description: '发布标签，例如 v1.0.9-workbuddy'
         required: true
         default: 'v1.0.9-workbuddy'
+      run_id:
+        description: '提供产物的 Build simulator app 运行 ID（留空自动找最新成功的）'
+        required: false
+        default: ''
   push:
     branches: [main]
     paths: ['.github/workflows/release.yml']
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   release:
-    runs-on: macos-15
-    timeout-minutes: 90
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fetch pinned embedded toolchain
-        run: python3 scripts/fetch_toolchain.py
-
-      - name: Build simulator app
+      - name: Find the latest successful build artifacts
+        id: find
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          python3 scripts/build.py --simulator --sdk-root "$(xcrun --sdk iphonesimulator --show-sdk-path)" 2>&1 | tee build.log
-          cd build/simulator
-          ditto -c -k --sequesterRsrc --keepParent TheosMobileCompiler.app Dylix-simulator.zip
-          shasum -a 256 Dylix-simulator.zip > Dylix-simulator.zip.sha256
+          set -eu
+          RUN="${{ inputs.run_id }}"
+          if [ -z "$RUN" ]; then
+            RUN=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow build.yml --status success --limit 1 \
+                  --json databaseId --jq '.[0].databaseId')
+          fi
+          echo "run-id=$RUN" >> "$GITHUB_OUTPUT"
+          gh run view "$RUN" --repo "$GITHUB_REPOSITORY" --json displayTitle,headSha
+
+      - name: Download build artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          gh run download "${{ steps.find.outputs.run-id }}" --repo "$GITHUB_REPOSITORY" \
+            --name Dylix-simulator --dir out
+          gh run download "${{ steps.find.outputs.run-id }}" --repo "$GITHUB_REPOSITORY" \
+            --name build-log --dir out
+          ls -lR out
+
+      - name: Verify digest
+        run: |
+          set -eu
+          cd out
+          shasum -a 256 -c Dylix-simulator.zip.sha256
 
       - name: Publish release
         env:
@@ -47,13 +73,13 @@ jobs:
 
           这不是可安装到真机的 IPA：真机安装需要你自己的签名证书与描述文件，本仓库不附带任何个人签名材料。
 
-          源码基于 https://github.com/yangokok886/dylix（GPL-3.0-or-later），改动见 `workbuddy` 分支与 CHANGELOG。
+          源码基于 https://github.com/yangokok886/dylix （GPL-3.0-or-later），改动见 `workbuddy` 分支与 CHANGELOG。
           EOF
           )
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" build/simulator/Dylix-simulator.zip build/simulator/Dylix-simulator.zip.sha256 build.log --clobber
+            gh release upload "$TAG" out/Dylix-simulator.zip out/Dylix-simulator.zip.sha256 out/build.log --clobber
             echo "上传到已存在的 Release $TAG"
           else
-            gh release create "$TAG" build/simulator/Dylix-simulator.zip build/simulator/Dylix-simulator.zip.sha256 build.log \
+            gh release create "$TAG" out/Dylix-simulator.zip out/Dylix-simulator.zip.sha256 out/build.log \
               --title "Dylix 模拟器构建 $TAG" --notes "$BODY"
           fi
