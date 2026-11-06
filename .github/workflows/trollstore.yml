@@ -14,17 +14,27 @@ permissions:
 
 jobs:
   trollstore:
-    runs-on: macos-15
+    # macos-15 的 arm64 运行器最近排队超 15 分钟、拿不到机器；macos-13 是 Intel 池，通常更快。
+    # 构建输出与 CPU 架构无关：产物目标仍是 iphoneos arm64。
+    runs-on: macos-13
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
+      - name: Show toolchain versions
+        run: |
+          xcodebuild -version
+          python3 --version
+          cmake --version
+          swift --version
+
       - name: Fetch pinned embedded toolchain
         run: python3 scripts/fetch_toolchain.py
 
-      - name: Build ad-hoc IPA
+      - name: Build device app
         run: |
           set -eu
+          xcrun --sdk iphoneos --show-sdk-path
           python3 scripts/build.py --sdk-root "$(xcrun --sdk iphoneos --show-sdk-path)" 2>&1 | tee build.log
           IPA=$(ls build/*-unsigned.ipa)
           mv "$IPA" build/Dylix-1.0.9-workbuddy-trollstore.ipa
