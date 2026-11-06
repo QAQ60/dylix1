@@ -5,9 +5,6 @@ name: Build simulator app
 # 签名证书与描述文件，本项目不附带任何个人证书或共享签名材料。
 on:
   workflow_dispatch:
-  push:
-    branches: [main, workbuddy]
-    paths-ignore: ['docs/**', '**/*.md']
 
 jobs:
   simulator:

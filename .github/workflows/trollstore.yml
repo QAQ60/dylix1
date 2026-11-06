@@ -3,10 +3,8 @@ name: Build TrollStore IPA
 # 构建免签名（ad-hoc）的 Dylix IPA，供 TrollStore 安装。
 # 不使用任何个人证书；App 与扩展都用 "-" 自身签名，TrollStore 安装时会重新签名并授权。
 #
-# 说明：GitHub 当前只有 macos-15 / macos-26 的 macOS 运行器（macos-13 已下线，
-# macos-14 自 2026-11-02 起停止支持）。高峰期 macOS 运行器排队可能超过 15 分钟。
-# 该任务在上一次超时后，可通过「Re-run failed jobs」或再次推送同一提交重试；
-# 成功后会直接把 IPA 发布到 Release。
+# 说明：macos-15 / macos-26 / macos-latest 都是 arm64(M1) 池，高峰期容量紧张；
+# 本任务走 macos-15-intel 的 Intel 池。公共仓库标准运行器免费且不限分钟数。
 on:
   workflow_dispatch:
   push:
@@ -22,7 +20,10 @@ concurrency:
 
 jobs:
   trollstore:
-    runs-on: macos-15
+    # macos-15 / macos-26 / macos-latest 都是 arm64(M1) 池，高峰期容量紧张、长时间排不到。
+    # macos-15-intel 是独立的 Intel 池（4 CPU / 14 GB），公共仓库免费且无限。
+    # 构建产物目标仍是 iphoneos arm64，与宿主 CPU 无关。
+    runs-on: macos-15-intel
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
