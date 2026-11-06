@@ -116,8 +116,15 @@ jobs:
           EOF
           )
           if gh release view "$TAG" >/dev/null 2>&1; then
+            # 先删掉旧的同名资产，避免 --clobber 覆盖失败
+            for name in Dylix-1.0.9-workbuddy-trollstore.ipa Dylix-1.0.9-workbuddy-trollstore.ipa.sha256 build.log; do
+              if gh release view "$TAG" --json assets --jq ".assets[] | select(.name==\"$name\") | .name" | grep -q .; then
+                gh release delete-asset "$TAG" "$name" --yes || echo "delete-asset $name 未成功，继续"
+              fi
+            done
             gh release upload "$TAG" build/Dylix-1.0.9-workbuddy-trollstore.ipa \
-              build/Dylix-1.0.9-workbuddy-trollstore.ipa.sha256 build.log --clobber
+              build/Dylix-1.0.9-workbuddy-trollstore.ipa.sha256 build.log
+            echo "已上传到 Release $TAG"
           else
             gh release create "$TAG" build/Dylix-1.0.9-workbuddy-trollstore.ipa \
               build/Dylix-1.0.9-workbuddy-trollstore.ipa.sha256 build.log \
