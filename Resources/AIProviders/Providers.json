@@ -198,6 +198,42 @@
       "modelsURL": "https://api.x.ai/v1/models"
     },
     {
+      "id": "workbuddy",
+      "name": "腾讯 WorkBuddy",
+      "baseURL": "https://copilot.tencent.com/v2",
+      "description": "腾讯 CodeBuddy 开发工作台（WorkBuddy）；需填网关签发的 Bearer 令牌，模型目录来自 /v3/config",
+      "wireProtocol": "chat",
+      "auth": [
+        "apiKey"
+      ],
+      "capabilities": {
+        "text": "unknown",
+        "stream": "unknown",
+        "image": "unknown",
+        "tools": "unknown",
+        "thinking": "unknown"
+      },
+      "modelsURL": "https://copilot.tencent.com/v3/config"
+    },
+    {
+      "id": "workbuddy-ai",
+      "name": "腾讯 WorkBuddy · 国际站",
+      "baseURL": "https://workbuddy.ai/v2",
+      "description": "WorkBuddy 国际站（workbuddy.ai）；同样需要 Bearer 令牌，模型目录来自 /v3/config",
+      "wireProtocol": "chat",
+      "auth": [
+        "apiKey"
+      ],
+      "capabilities": {
+        "text": "unknown",
+        "stream": "unknown",
+        "image": "unknown",
+        "tools": "unknown",
+        "thinking": "unknown"
+      },
+      "modelsURL": "https://workbuddy.ai/v3/config"
+    },
+    {
       "id": "custom",
       "name": "自定义 OpenAI 兼容服务",
       "baseURL": "",

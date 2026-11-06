@@ -4,6 +4,8 @@
 
 设置 → AI 开发助手 → ＋。保留原8家，新增 Kimi（Moonshot）、xAI（Grok）和正式的自定义 OpenAI 兼容入口。自定义入口需自行填写服务地址；App不预置中转地址或密钥。
 
+后续新增 WorkBuddy（腾讯 CodeBuddy 开发工作台，`workbuddy` / `workbuddy-ai`）：`App/AI/Providers/TFAIWorkBuddy.{h,m}` 只对这两个 id 生效，负责请求头、`system` 首条约束、工具名与 schema 整形、`tool_choice` 写法、思考档位，以及 `11101/11128/11153` 的一次性修补重发；模型目录是 `GET <base 去掉 /v2>/v3/config` 的 `cli` agent。网关只认 WorkBuddy 账户的 Bearer 令牌，连接里以 API 密钥形式填写；OAuth 登录需要 WorkBuddy 客户端的公开客户端参数与回跳 scheme，本期未接入。
+
 服务目录位于 `Resources/AIProviders/Providers.json`，按模型族的思考档位位于 `Thinking.json`。目录中的五项能力初值全部为unknown，模型发现本身不证明调用能力。获取官方模型列表后仍可手工添加模型ID；现有分页、Gemini generateContent筛选和四项实际探测保留。更换模型、地址、协议、鉴权方式或客户端ID后重新验证能力。
 
 在会话模型菜单切换服务商/模型，先做文本连接探测；通过后更新下一轮连接。失败保留原连接并显示错误，进行中的一轮保持原连接快照。项目覆盖与全局默认仍各自保存；切换不会新建项目、清除历史或重置人设/技能/记忆。标题显示服务商、模型及实测支持/失败状态，其他能力保持unknown。

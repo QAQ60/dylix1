@@ -75,6 +75,32 @@
       ]
     },
     {
+      "modelPattern": "^(glm|kimi-k3|kimi-k2\\.7|deepseek-v4)",
+      "levels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "protocols": [
+        "workbuddy",
+        "workbuddy-ai"
+      ]
+    },
+    {
+      "modelPattern": "^(gpt-6|gpt-5|o1|o3|o4|gemini-3)",
+      "levels": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "protocols": [
+        "workbuddy",
+        "workbuddy-ai"
+      ]
+    },
+    {
       "modelPattern": "^(qwen3|qwen-plus|qwen-turbo)",
       "levels": [
         "enabled"

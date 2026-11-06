@@ -1,5 +1,6 @@
 #import "TFAIProtocol.h"
 #import "TFAIRegistry.h"
+#import "TFAIWorkBuddy.h"
 #import <arpa/inet.h>
 NSError *TFAIError(NSInteger code, NSString *message){return [NSError errorWithDomain:@"TweakForge.AI" code:code userInfo:@{NSLocalizedDescriptionKey:message?:@"AI 请求失败"}];}
 NSArray<NSDictionary *> *TFAIProtocolCatalog(void){return TFAIProviderRegistry();}
@@ -40,8 +41,15 @@ NSString *TFAIReasoningRequestSummary(NSDictionary *body,NSDictionary *c){
 }
 NSDictionary *TFAISanitizeProbeDiagnostics(NSDictionary *input,NSString *secret){if(![input isKindOfClass:NSDictionary.class])return @{};NSMutableDictionary *out=[NSMutableDictionary new];NSSet *numbers=[NSSet setWithArray:@[@"timestamp",@"duration",@"httpStatus"]];for(NSString *key in @[@"protocol",@"model",@"endpoint",@"httpStatus",@"requestSummary",@"responseText",@"responseBody",@"timestamp",@"duration",@"expected",@"reason",@"testImage",@"reasoningSummary"]){id value=input[key];if([numbers containsObject:key]){if([value isKindOfClass:NSNumber.class]&&isfinite([value doubleValue]))out[key]=value;continue;}if(![value isKindOfClass:NSString.class])continue;NSString *text=value;if([key isEqual:@"testImage"]){NSData *data=[[NSData alloc]initWithBase64EncodedString:text options:0];if(data.length<=128*1024&&data.length>8&&memcmp(data.bytes,"\x89PNG\r\n\x1a\n",8)==0)out[key]=text;continue;}if([key isEqual:@"endpoint"]){NSURLComponents *u=[NSURLComponents componentsWithString:text];if(!u.host.length)continue;u.user=nil;u.password=nil;u.query=nil;u.fragment=nil;text=u.URL.absoluteString?:@"";}if(secret.length)text=[text stringByReplacingOccurrencesOfString:secret withString:@"[REDACTED]"];for(NSString *pattern in @[@"(?i)(bearer\\s+)[A-Za-z0-9._~+/-]+",@"(?i)(api[_-]?key|authorization|access[_-]?token|token|secret)([\\\"' :=]+)[A-Za-z0-9._~+/-]{6,}",@"(?i)(sk-|github_pat_|AIza)[A-Za-z0-9_-]{12,}"]){NSRegularExpression *rx=[NSRegularExpression regularExpressionWithPattern:pattern options:0 error:nil];text=[rx stringByReplacingMatchesInString:text options:0 range:NSMakeRange(0,text.length) withTemplate:@"[REDACTED]"];}NSUInteger max=[key isEqual:@"responseBody"]?16000:8000;out[key]=[text substringToIndex:MIN(text.length,max)];}return out;}
 static BOOL LocalHost(NSString *host){NSString *h=host.lowercaseString;if([h isEqual:@"localhost"]||[h hasSuffix:@".local"]||[h isEqual:@"::1"]||[h isEqual:@"[::1]"])return YES;struct in_addr a;if(inet_pton(AF_INET,h.UTF8String,&a)==1){uint32_t v=ntohl(a.s_addr);return (v>>24)==10||(v>>24)==127||(v>>16)==0xc0a8||(v>>20)==0xac1||(v>>16)==0xa9fe;}return NO;}
-NSString *TFAIUserAgent(NSDictionary *c,NSError **error){id raw=c[@"userAgent"];if(!raw)return @"";if(![raw isKindOfClass:NSString.class]||[raw length]>512){if(error)*error=TFAIError(4,@"User-Agent 请填写 512 字符以内的单行英文文本。");return nil;}for(NSUInteger i=0;i<[raw length];i++){unichar ch=[raw characterAtIndex:i];if(ch<32||ch>126){if(error)*error=TFAIError(4,@"User-Agent 仅接受可打印 ASCII 字符，请去掉换行和特殊字符。");return nil;}}return [raw stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];}
+NSString *TFAIUserAgent(NSDictionary *c,NSError **error){
+ if(TFAIWorkBuddyProvider(c[@"protocol"])){ // WorkBuddy 用客户端标识，自订值会被网关当成别的产品
+  id raw=c[@"userAgent"];
+  if(raw&&(![raw isKindOfClass:NSString.class]||[raw length]>512)){if(error)*error=TFAIError(4,@"User-Agent 请填写 512 字符以内的单行英文文本。");return nil;}
+  return @"";
+ }
+ id raw=c[@"userAgent"];if(!raw)return @"";if(![raw isKindOfClass:NSString.class]||[raw length]>512){if(error)*error=TFAIError(4,@"User-Agent 请填写 512 字符以内的单行英文文本。");return nil;}for(NSUInteger i=0;i<[raw length];i++){unichar ch=[raw characterAtIndex:i];if(ch<32||ch>126){if(error)*error=TFAIError(4,@"User-Agent 仅接受可打印 ASCII 字符，请去掉换行和特殊字符。");return nil;}}return [raw stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];}
 NSURL *TFAIEndpoint(NSDictionary *c,BOOL models,NSError **error){
+ if(models&&TFAIWorkBuddyProvider(c[@"protocol"]))return TFAIWorkBuddyConfigURL(c,error);
  NSString *raw=[c[@"baseURL"] isKindOfClass:NSString.class]?c[@"baseURL"]:@"";NSURLComponents *u=[NSURLComponents componentsWithString:[raw stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet]];
  BOOL tls=[u.scheme.lowercaseString isEqual:@"https"],http=[u.scheme.lowercaseString isEqual:@"http"]&&([c[@"allowHTTP"] boolValue]||([c[@"allowLANHTTP"] boolValue]&&LocalHost(u.host)));
  if(!u.host.length||(!tls&&!http)||u.user.length||u.password.length||u.query.length||u.fragment.length||([c[@"authMethod"] isEqual:@"oauth"]&&!tls)){if(error)*error=TFAIError(1,@"请填写 HTTPS Base URL，或为此连接明确启用 HTTP。地址中请勿携带账号、密钥或查询参数；官方 OAuth 使用 HTTPS。");return nil;}
@@ -67,7 +75,7 @@ static NSDictionary *TFAIGeminiRequest(NSArray *messages,NSDictionary *c,NSArray
 }
 NSDictionary *TFAIRequestBody(NSArray *messages,NSDictionary *c,NSArray *tools,BOOL stream,NSError **error){
  NSString *model=Str(c[@"model"]),*original=c[@"protocol"]?:@"chat",*protocol=WireProtocol(original);if(!model.length){if(error)*error=TFAIError(3,@"请先选择或填写模型 ID");return nil;}
- if([protocol isEqual:@"gemini"])return TFAIGeminiRequest(messages,c,tools,error);NSMutableDictionary *body=[@{@"model":model,@"stream":@(stream)} mutableCopy];if([protocol isEqual:@"chat"]&&stream&&![c[@"omitStreamUsage"] boolValue])body[@"stream_options"]=@{@"include_usage":@YES};NSMutableArray *out=[NSMutableArray new];NSMutableArray *system=[NSMutableArray new];NSUInteger imageBytes=0;
+ if([protocol isEqual:@"gemini"])return TFAIGeminiRequest(messages,c,tools,error);BOOL workbuddy=TFAIWorkBuddyProvider(original);NSMutableDictionary *body=[@{@"model":model,@"stream":@(stream)} mutableCopy];if([protocol isEqual:@"chat"]&&stream&&![c[@"omitStreamUsage"] boolValue]&&!workbuddy)body[@"stream_options"]=@{@"include_usage":@YES};NSMutableArray *out=[NSMutableArray new];NSMutableArray *system=[NSMutableArray new];NSUInteger imageBytes=0;
  for(id entry in messages){if(![entry isKindOfClass:NSDictionary.class])continue;NSDictionary *m=entry;NSString *role=Str(m[@"role"]),*text=Str(m[@"content"]);if(![@[@"system",@"user",@"assistant",@"tool"] containsObject:role])continue;NSArray *calls=[m[@"tool_calls"] isKindOfClass:NSArray.class]?m[@"tool_calls"]:@[];NSMutableArray *images=[NSMutableArray new];
   for(id item in ([m[@"images"] isKindOfClass:NSArray.class]?m[@"images"]:@[])){if(![item isKindOfClass:NSDictionary.class])continue;NSString *data=Str(item[@"data"]),*mime=Str(item[@"mime"]);if(![@[@"image/png",@"image/jpeg",@"image/webp",@"image/gif"] containsObject:mime]||!data.length||![[NSData alloc]initWithBase64EncodedString:data options:0]){if(error)*error=TFAIError(4,@"图片附件格式无效");return nil;}imageBytes+=data.length;if(imageBytes>12*1024*1024){if(error)*error=TFAIError(4,@"图片附件超过 12 MB 编码上限，请减少图片");return nil;}[images addObject:@{@"data":data,@"mime":mime}];}
   if([protocol isEqual:@"chat"]){NSMutableDictionary *v=[@{@"role":role,@"content":text} mutableCopy];if(images.count){NSMutableArray *parts=[NSMutableArray arrayWithObject:@{@"type":@"text",@"text":text}];for(NSDictionary *im in images)[parts addObject:@{@"type":@"image_url",@"image_url":@{@"url":[NSString stringWithFormat:@"data:%@;base64,%@",im[@"mime"],im[@"data"]]}}];v[@"content"]=parts;}if([role isEqual:@"tool"])v[@"tool_call_id"]=Str(m[@"tool_call_id"]);if(([original isEqual:@"deepseek"]||[model.lowercaseString.lastPathComponent hasPrefix:@"deepseek"])&&[role isEqual:@"assistant"]&&[m[@"providerProtocol"] isEqual:original]&&[m[@"providerModel"] isEqual:model]&&[m[@"providerConnectionID"] isEqual:c[@"id"]])for(NSDictionary *item in m[@"provider_items"])if([item[@"type"] isEqual:@"deepseek_reasoning"])v[@"reasoning_content"]=Str(item[@"content"]);if(calls.count){NSMutableArray *list=[NSMutableArray new];for(NSDictionary *call in calls)[list addObject:@{@"id":Str(call[@"id"]),@"type":@"function",@"function":@{@"name":Str(call[@"name"]),@"arguments":JSONText(call[@"arguments"])}}];v[@"tool_calls"]=list;}[out addObject:v];}
@@ -78,8 +86,10 @@ NSDictionary *TFAIRequestBody(NSArray *messages,NSDictionary *c,NSArray *tools,B
  if([protocol isEqual:@"responses"]){body[@"store"]=@NO;if([Str(c[@"model"]).lowercaseString hasPrefix:@"gpt-5"]||[Str(c[@"model"]).lowercaseString hasPrefix:@"o3"]||[Str(c[@"model"]).lowercaseString hasPrefix:@"o4-mini"])body[@"reasoning"]=@{@"summary":@"auto"};body[@"include"]=@[@"reasoning.encrypted_content"];body[@"max_output_tokens"]=@4096;}
  NSString *effort=Str(c[@"reasoningEffort"]);BOOL requested=effort.length&&![effort isEqual:@"auto"];if([protocol isEqual:@"anthropic"]){body[@"max_tokens"]=@4096;if(system.count)body[@"system"]=[system componentsJoinedByString:@"\n\n"];}
  if(requested){if(![[TFAIReasoningOptions(c) valueForKey:@"id"] containsObject:effort]){if(error)*error=TFAIError(5,@"此模型未声明该思考档位，请恢复默认或核对模型 ID");return nil;}
+ if(workbuddy){ // 网关只认 OpenAI 的 effort 字段，档位由 TFAIWorkBuddyPlan 统一处理
+  body[@"reasoning_effort"]=effort;}else{
  NSString *family=model.lowercaseString.lastPathComponent;
- NSString *thinkingWire=TFAIThinkingConfiguration(c)[@"wire"];
+ NSString *thinkingWire=[TFAIThinkingConfiguration(c) objectForKey:@"wire"];
  if([thinkingWire isEqual:@"reasoning_effort"])body[@"reasoning_effort"]=effort;
  else if([thinkingWire isEqual:@"enable_thinking"])body[@"enable_thinking"]=@YES;
  else if([thinkingWire isEqual:@"thinking"]){body[@"thinking"]=@{@"type":@"enabled"};if(![effort isEqual:@"enabled"])body[@"reasoning_effort"]=effort;}
@@ -89,6 +99,7 @@ NSDictionary *TFAIRequestBody(NSArray *messages,NSDictionary *c,NSArray *tools,B
  else if([family hasPrefix:@"deepseek"]||[original isEqual:@"deepseek"]){body[@"thinking"]=@{@"type":@"enabled"};if(![effort isEqual:@"enabled"])body[@"reasoning_effort"]=effort;}
  else if([effort isEqual:@"enabled"]){body[@"enable_thinking"]=@YES;}
  else body[@"reasoning_effort"]=effort;
+ }
  }
  if(tools.count&&(!c[@"toolsEnabled"]||[c[@"toolsEnabled"] boolValue])&&![c[@"capabilities"][@"tools"] isEqual:@"unsupported"]){NSMutableArray *encoded=[NSMutableArray new];for(NSDictionary *tool in tools){if([protocol isEqual:@"chat"])[encoded addObject:@{@"type":@"function",@"function":tool}];else if([protocol isEqual:@"responses"]){NSMutableDictionary *f=[tool mutableCopy];f[@"type"]=@"function";f[@"strict"]=@NO;[encoded addObject:f];}else [encoded addObject:@{@"name":tool[@"name"]?:@"",@"description":tool[@"description"]?:@"",@"input_schema":tool[@"parameters"]?:@{@"type":@"object"}}];}body[@"tools"]=encoded;}
  return body;
