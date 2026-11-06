@@ -1,0 +1,26 @@
+name: Runners info
+
+on: workflow_dispatch
+
+jobs:
+  info:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: List runners and recent runs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          echo '== repos/${{ github.repository }}/actions/runners =='
+          gh api "repos/${{ github.repository }}/actions/runners" || true
+          echo '== org/user billing (may need a token scope) =='
+          gh api user --jq '{login, plan:.plan}' || true
+          echo '== recent runs with runner labels =='
+          gh run list --repo "$GITHUB_REPOSITORY" --limit 12 --json name,status,conclusion,createdAt,workflowName
+          echo '== quota if available (private/public repos differ) =='
+          gh api "repos/${{ github.repository }}/actions/runners/downloads" || true
+          curl -s -o /dev/null -w 'macos-13 page: %{http_code}\n' https://github.com/actions/runner-images
