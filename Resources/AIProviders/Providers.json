@@ -227,7 +227,7 @@
     {
       "id": "workbuddy-ai",
       "name": "腾讯 WorkBuddy · 国际站",
-      "baseURL": "https://workbuddy.ai/v2",
+      "baseURL": "https://www.workbuddy.ai/v2",
       "description": "WorkBuddy 国际站（workbuddy.ai）；支持账号登录，无需 API Key",
       "wireProtocol": "chat",
       "auth": [
@@ -241,7 +241,7 @@
         "tools": "unknown",
         "thinking": "unknown"
       },
-      "modelsURL": "https://workbuddy.ai/v3/config",
+      "modelsURL": "https://www.workbuddy.ai/v3/config",
       "oauth": {
         "kind": "workbuddy",
         "authURL": "https://www.workbuddy.ai/v2/plugin/auth/state",
