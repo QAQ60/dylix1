@@ -9,7 +9,12 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['.github/workflows/trollstore.yml']
+    paths:
+      - '.github/workflows/trollstore.yml'
+      - 'App/**'
+      - 'Resources/**'
+      - 'scripts/**'
+      - 'Vendor/**'
 
 permissions:
   contents: write
