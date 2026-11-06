@@ -1,0 +1,59 @@
+name: Release simulator build
+
+# 把模拟器构建的产物发布成 GitHub Release 附件。
+# 只能发布模拟器包；可安装到真机的 IPA 需要你自己的签名证书与描述文件，不在这里发布。
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '发布标签，例如 v1.0.9-workbuddy'
+        required: true
+        default: 'v1.0.9-workbuddy'
+  push:
+    branches: [main]
+    paths: ['.github/workflows/release.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch pinned embedded toolchain
+        run: python3 scripts/fetch_toolchain.py
+
+      - name: Build simulator app
+        run: |
+          python3 scripts/build.py --simulator --sdk-root "$(xcrun --sdk iphonesimulator --show-sdk-path)" 2>&1 | tee build.log
+          cd build/simulator
+          ditto -c -k --sequesterRsrc --keepParent TheosMobileCompiler.app Dylix-simulator.zip
+          shasum -a 256 Dylix-simulator.zip > Dylix-simulator.zip.sha256
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || 'v1.0.9-workbuddy' }}
+        run: |
+          set -eu
+          BODY=$(cat <<'EOF'
+          由 GitHub Actions 构建的 Dylix 模拟器包（含 WorkBuddy AI 服务商适配）。
+
+          - `Dylix-simulator.zip`：`TheosMobileCompiler.app`，x86_64 模拟器版，只能在 Mac 的 iOS 模拟器中运行。
+          - `build.log`：完整构建日志。
+
+          这不是可安装到真机的 IPA：真机安装需要你自己的签名证书与描述文件，本仓库不附带任何个人签名材料。
+
+          源码基于 https://github.com/yangokok886/dylix（GPL-3.0-or-later），改动见 `workbuddy` 分支与 CHANGELOG。
+          EOF
+          )
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" build/simulator/Dylix-simulator.zip build/simulator/Dylix-simulator.zip.sha256 build.log --clobber
+            echo "上传到已存在的 Release $TAG"
+          else
+            gh release create "$TAG" build/simulator/Dylix-simulator.zip build/simulator/Dylix-simulator.zip.sha256 build.log \
+              --title "Dylix 模拟器构建 $TAG" --notes "$BODY"
+          fi
