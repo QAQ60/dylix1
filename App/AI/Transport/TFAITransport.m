@@ -96,6 +96,8 @@ static NSNumber *TFOriginPort(NSURL *url){return url.port?:([url.scheme.lowercas
   NSDictionary *headers=models?TFAIWorkBuddyConfigHeaders(connection):TFAIWorkBuddyChatHeaders(connection);
   for(NSString *field in headers)[request setValue:headers[field] forHTTPHeaderField:field];
   if([connection[@"authMethod"] isEqual:@"oauth"]&&key.length)[request setValue:[@"Bearer " stringByAppendingString:key] forHTTPHeaderField:@"Authorization"];
+  NSDictionary *account=[[TFAIOAuth shared] accountHeaders:connection];
+  for(NSString *field in account)[request setValue:account[field] forHTTPHeaderField:field];
  }
  if(!models){NSDictionary *body=workbuddy?:TFAIRequestBody(messages,connection,tools,stream,&error);if(!body){[self endError:error];return;}
   if(workbuddy){NSDictionary *attempt=nil,*names=nil;TFAIWorkBuddyPlan(workbuddy,connection,tools,&attempt,&names);body=attempt?:body;self.workbuddyBody=body;self.workbuddyAttempt=body;self.workbuddyNames=names?:@{};}

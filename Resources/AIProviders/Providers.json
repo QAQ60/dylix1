@@ -201,9 +201,10 @@
       "id": "workbuddy",
       "name": "腾讯 WorkBuddy",
       "baseURL": "https://copilot.tencent.com/v2",
-      "description": "腾讯 CodeBuddy 开发工作台（WorkBuddy）；需填网关签发的 Bearer 令牌，模型目录来自 /v3/config",
+      "description": "腾讯 CodeBuddy 开发工作台（WorkBuddy）；支持账号登录，无需 API Key",
       "wireProtocol": "chat",
       "auth": [
+        "oauth",
         "apiKey"
       ],
       "capabilities": {
@@ -213,15 +214,24 @@
         "tools": "unknown",
         "thinking": "unknown"
       },
-      "modelsURL": "https://copilot.tencent.com/v3/config"
+      "modelsURL": "https://copilot.tencent.com/v3/config",
+      "oauth": {
+        "kind": "workbuddy",
+        "authURL": "https://copilot.tencent.com/v2/plugin/auth/state",
+        "tokenURL": "https://copilot.tencent.com/v2/plugin/auth/token",
+        "refreshURL": "https://copilot.tencent.com/v2/plugin/auth/token/refresh",
+        "accountURL": "https://copilot.tencent.com/v2/plugin/login/account",
+        "platform": "workbuddy"
+      }
     },
     {
       "id": "workbuddy-ai",
       "name": "腾讯 WorkBuddy · 国际站",
       "baseURL": "https://workbuddy.ai/v2",
-      "description": "WorkBuddy 国际站（workbuddy.ai）；同样需要 Bearer 令牌，模型目录来自 /v3/config",
+      "description": "WorkBuddy 国际站（workbuddy.ai）；支持账号登录，无需 API Key",
       "wireProtocol": "chat",
       "auth": [
+        "oauth",
         "apiKey"
       ],
       "capabilities": {
@@ -231,7 +241,15 @@
         "tools": "unknown",
         "thinking": "unknown"
       },
-      "modelsURL": "https://workbuddy.ai/v3/config"
+      "modelsURL": "https://workbuddy.ai/v3/config",
+      "oauth": {
+        "kind": "workbuddy",
+        "authURL": "https://www.workbuddy.ai/v2/plugin/auth/state",
+        "tokenURL": "https://www.workbuddy.ai/v2/plugin/auth/token",
+        "refreshURL": "https://www.workbuddy.ai/v2/plugin/auth/token/refresh",
+        "accountURL": "https://www.workbuddy.ai/v2/plugin/login/account",
+        "platform": "workbuddy-ai"
+      }
     },
     {
       "id": "custom",
