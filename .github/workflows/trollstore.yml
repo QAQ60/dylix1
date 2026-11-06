@@ -1,0 +1,70 @@
+name: Build TrollStore IPA
+
+# 构建免签名（ad-hoc）的 Dylix IPA，供 TrollStore 安装。
+# 不使用任何个人证书；App 与两个扩展都用 "-" 自身签名，TrollStore 安装时会用
+# ldid -S 重新签名并授予其平台权限。
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/trollstore.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  trollstore:
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch pinned embedded toolchain
+        run: python3 scripts/fetch_toolchain.py
+
+      - name: Build ad-hoc IPA
+        run: |
+          set -eu
+          python3 scripts/build.py --sdk-root "$(xcrun --sdk iphoneos --show-sdk-path)" 2>&1 | tee build.log
+          IPA=$(ls build/*-unsigned.ipa)
+          mv "$IPA" build/Dylix-1.0.9-workbuddy-trollstore.ipa
+          shasum -a 256 build/Dylix-1.0.9-workbuddy-trollstore.ipa > build/Dylix-1.0.9-workbuddy-trollstore.ipa.sha256
+          echo "IPA_SHA=$(cut -d' ' -f1 build/Dylix-1.0.9-workbuddy-trollstore.ipa.sha256)"
+
+      - name: Inspect IPA
+        run: |
+          set -eu
+          IPA=build/Dylix-1.0.9-workbuddy-trollstore.ipa
+          unzip -l "$IPA" | grep -E 'Payload/.*\.app/$|appex/$|\.framework/$' | head -30
+          codesign -dv --verbose=2 "$IPA" 2>&1 | head -5 || true
+          for m in $(unzip -Z1 "$IPA" | grep -E '(TheosMobileCompiler|TFTaskActivity|TweakForgeActivity|TweakForgeShare)$' | head -5); do
+            unzip -o -q "$IPA" "$m" -d inspect
+            codesign -d --entitlements :- "inspect/$m" 2>/dev/null | head -20 || true
+          done
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          TAG=v1.0.9-workbuddy-trollstore
+          BODY=$(cat <<'EOF'
+          Dylix 1.0.9（Build201）+ WorkBuddy AI 服务商适配，免签名构建，供 TrollStore 安装。
+
+          - `Dylix-1.0.9-workbuddy-trollstore.ipa`：ad-hoc 签名（"-"）的 IPA，没有使用任何个人证书。
+          - `build.log`：完整构建日志。
+
+          **TrollStore 安装**：用 TrollStore 打开本 IPA（或在 TrollStore 中「Install IPA File」选择它）。
+          TrollStore 会以 ldid -S 重新签名并授予平台权限，不需要 Apple 开发者证书。
+
+          **不适用**：没有越狱或巨魔的普通设备无法安装；这类设备需要自己的签名证书。Live Activity / 分享扩展在 TrollStore 下的行为与真实签名不完全一致，未逐一验证。
+
+          源码基于 https://github.com/yangokok886/dylix （GPL-3.0-or-later）。
+          EOF
+          )
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" build/Dylix-1.0.9-workbuddy-trollstore.ipa build/Dylix-1.0.9-workbuddy-trollstore.ipa.sha256 build.log --clobber
+          else
+            gh release create "$TAG" build/Dylix-1.0.9-workbuddy-trollstore.ipa build/Dylix-1.0.9-workbuddy-trollstore.ipa.sha256 build.log \
+              --title "Dylix 1.0.9 WorkBuddy · TrollStore 免签名 IPA" --notes "$BODY"
+          fi
