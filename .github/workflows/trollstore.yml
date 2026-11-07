@@ -115,18 +115,11 @@ jobs:
           源码基于 https://github.com/yangokok886/dylix （GPL-3.0-or-later）。
           EOF
           )
+          # 先把整个 Release（含所有历史资产）彻底删除，再重建，保证没有残留旧文件
           if gh release view "$TAG" >/dev/null 2>&1; then
-            # 每次先删掉旧的同名资产再上传，保证 Release 里只有最新一份
-            for name in Dylix-1.0.9-workbuddy-trollstore.ipa Dylix-1.0.9-workbuddy-trollstore.ipa.sha256 build.log; do
-              if gh release view "$TAG" --json assets --jq ".assets[].name" | grep -qx "$name"; then
-                gh release delete-asset "$TAG" "$name" --yes
-              fi
-            done
-            gh release upload "$TAG" build/Dylix-1.0.9-workbuddy-trollstore.ipa \
-              build/Dylix-1.0.9-workbuddy-trollstore.ipa.sha256 build.log
-            echo "已删除旧资产并上传新包到 Release $TAG"
-          else
-            gh release create "$TAG" build/Dylix-1.0.9-workbuddy-trollstore.ipa \
-              build/Dylix-1.0.9-workbuddy-trollstore.ipa.sha256 build.log \
-              --title "Dylix 1.0.9 WorkBuddy · TrollStore 免签名 IPA" --notes "$BODY"
+            gh release delete "$TAG" --yes
           fi
+          gh release create "$TAG" build/Dylix-1.0.9-workbuddy-trollstore.ipa \
+            build/Dylix-1.0.9-workbuddy-trollstore.ipa.sha256 build.log \
+            --title "Dylix 1.0.9 WorkBuddy · TrollStore 免签名 IPA" --notes "$BODY"
+          echo "已删除旧 Release 并重新发布到 $TAG"
