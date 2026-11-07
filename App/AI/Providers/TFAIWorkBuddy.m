@@ -78,6 +78,10 @@ NSURL *_Nullable TFAIWorkBuddyConfigURL(NSDictionary *connection,NSError **error
  NSString *raw=[connection[@"baseURL"] isKindOfClass:NSString.class]?connection[@"baseURL"]:@"";
  NSURLComponents *u=[NSURLComponents componentsWithString:[raw stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet]];
  if(!u.host.length||![u.scheme.lowercaseString isEqual:@"https"]){if(error)*error=[NSError errorWithDomain:@"TweakForge.AI" code:41 userInfo:@{NSLocalizedDescriptionKey:@"WorkBuddy 需要 HTTPS 服务地址"}];return nil;}
+ // 规整 host，避免裸域（workbuddy.ai）301 跳到 www 被当成跨域重定向拦截（error 25）
+ NSString *host=u.host.lowercaseString;
+ if([host isEqual:@"workbuddy.ai"])u.host=@"www.workbuddy.ai";
+ else if([host isEqual:@"www.copilot.tencent.com"])u.host=@"copilot.tencent.com";
  NSString *path=u.path?:@"";
  while([path hasSuffix:@"/"])path=[path substringToIndex:path.length-1];
  for(NSString *suffix in @[@"/v2/chat/completions",@"/chat/completions",@"/v2",@"/v3/config",@"/models"])if([path hasSuffix:suffix]){path=[path substringToIndex:path.length-suffix.length];break;}
